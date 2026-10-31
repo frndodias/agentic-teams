@@ -1,0 +1,26 @@
+bundle:
+  name: agentic-teams
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Catálogo da base mock
+    default: fc_catalog
+  schema:
+    description: Schema de dados de negócio (b_ / s_ / g_)
+    default: ecommerce
+  escala:
+    description: XS (teste de código) | S | M | L
+    default: M
+  seed:
+    description: Seed do gerador (mesma seed = mesmos dados)
+    default: "42"
+
+targets:
+  # O host vem do profile local (~/.databrickscfg); nada de URL ou segredo no repositório.
+  fevm:
+    default: true
+    workspace:
+      profile: fevm-fc

@@ -1,0 +1,66 @@
+resources:
+  jobs:
+    gerador:
+      name: ecommerce_gerador
+      description: "Gera os arquivos dos sistemas de origem na landing (data âncora = hoje)."
+      max_concurrent_runs: 1
+      performance_target: PERFORMANCE_OPTIMIZED
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${resources.schemas.ecommerce.name}
+        - name: escala
+          default: ${var.escala}
+        - name: seed
+          default: ${var.seed}
+        - name: data_ancora
+          default: "hoje"
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+
+      tasks:
+        - task_key: base
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/gerador/gerar.py
+            parameters: [--etapa, base, --catalog, "{{job.parameters.catalog}}", --schema, "{{job.parameters.schema}}", --escala, "{{job.parameters.escala}}", --seed, "{{job.parameters.seed}}", --data_ancora, "{{job.parameters.data_ancora}}"]
+
+        - task_key: pedidos
+          depends_on: [{task_key: base}]
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/gerador/gerar.py
+            parameters: [--etapa, pedidos, --catalog, "{{job.parameters.catalog}}", --schema, "{{job.parameters.schema}}", --escala, "{{job.parameters.escala}}", --seed, "{{job.parameters.seed}}", --data_ancora, "{{job.parameters.data_ancora}}"]
+
+        - task_key: operacao
+          depends_on: [{task_key: pedidos}]
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/gerador/gerar.py
+            parameters: [--etapa, operacao, --catalog, "{{job.parameters.catalog}}", --schema, "{{job.parameters.schema}}", --escala, "{{job.parameters.escala}}", --seed, "{{job.parameters.seed}}", --data_ancora, "{{job.parameters.data_ancora}}"]
+
+        - task_key: eventos_web
+          depends_on: [{task_key: pedidos}]
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/gerador/gerar.py
+            parameters: [--etapa, eventos_web, --catalog, "{{job.parameters.catalog}}", --schema, "{{job.parameters.schema}}", --escala, "{{job.parameters.escala}}", --seed, "{{job.parameters.seed}}", --data_ancora, "{{job.parameters.data_ancora}}"]
+
+        - task_key: marketing
+          depends_on: [{task_key: base}]
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/gerador/gerar.py
+            parameters: [--etapa, marketing, --catalog, "{{job.parameters.catalog}}", --schema, "{{job.parameters.schema}}", --escala, "{{job.parameters.escala}}", --seed, "{{job.parameters.seed}}", --data_ancora, "{{job.parameters.data_ancora}}"]
+
+        - task_key: gabarito
+          depends_on: [{task_key: operacao}]
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/gerador/gerar.py
+            parameters: [--etapa, gabarito, --catalog, "{{job.parameters.catalog}}", --schema, "{{job.parameters.schema}}", --escala, "{{job.parameters.escala}}", --seed, "{{job.parameters.seed}}", --data_ancora, "{{job.parameters.data_ancora}}"]

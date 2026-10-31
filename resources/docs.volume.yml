@@ -1,0 +1,8 @@
+resources:
+  volumes:
+    docs:
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.ecommerce.name}
+      name: docs
+      volume_type: MANAGED
+      comment: "Políticas, contrato de dados e manual do lojista (PDF)"

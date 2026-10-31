@@ -1,0 +1,6 @@
+resources:
+  schemas:
+    ecommerce:
+      catalog_name: ${var.catalog}
+      name: ${var.schema}
+      comment: "Base mock Nuvemshop-like (b_ bronze / s_ silver / g_ gold). Gerada por código: agentic-teams/src/gerador"
