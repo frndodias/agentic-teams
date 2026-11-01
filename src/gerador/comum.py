@@ -17,7 +17,7 @@ ESCALAS = {
     "M": dict(lojas=10_000, pedidos=30_000_000),
     "L": dict(lojas=50_000, pedidos=150_000_000),
 }
-PEDIDOS_POR_RELACAO = 1.70  # medido no XS após calibrar a recompra (~80% compram uma vez só)
+PEDIDOS_POR_RELACAO = 1.50  # medido na escala M após calibrar a recompra (~85% compram uma vez só)
 RELACOES_POR_PESSOA = 1.156  # 12% das pessoas compram em 2-3 lojas
 DIAS_HISTORICO = 730
 DIAS_EVENTOS_WEB = 90

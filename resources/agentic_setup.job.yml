@@ -1,0 +1,15 @@
+resources:
+  jobs:
+    agentic_setup:
+      name: agentic_teams_setup
+      description: "Camada agêntica no UC: documentos em texto (ai_parse_document) e tools governadas (UC Functions)."
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: setup
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/setup/criar_setup.py
+            parameters: [--catalog, "${var.catalog}"]

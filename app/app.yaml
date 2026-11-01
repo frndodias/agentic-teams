@@ -1,0 +1,24 @@
+command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: GITHUB_TOKEN
+    valueFrom: github-token
+  - name: PROMOVER_JOB_ID
+    valueFrom: job-promover
+  - name: GENIE_SPACE_ID
+    valueFrom: genie
+  - name: MLFLOW_EXPERIMENT_ID
+    valueFrom: experimento
+  - name: LAKEBASE_ENDPOINT
+    value: projects/agentic-teams/branches/production/endpoints/primary
+  - name: CATALOG
+    value: fc_catalog
+  - name: PR_REPO
+    value: frndodias/agentic-teams-pr
+  - name: GITHUB_APPROVAL_MODE
+    value: app_token
+  - name: MAX_ITERACOES
+    value: "3"
+  - name: REVISORES
+    value: ""

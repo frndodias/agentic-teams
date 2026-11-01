@@ -12,10 +12,11 @@ import vocab as V
 from comum import (DIAS_HISTORICO, SEG_DIA, Ctx, da_lista, embaralhar, entre, entre_int, escolher,
                    escrever_csv, escrever_json, ler_interno, salvar_interno, segundos_do_dia, sortear_dia,
                    tabelas_curva, ts_texto, u)
-from etapa_base import gerar_pessoas
+from etapa_base import formatar_cpf, gerar_pessoas
 
 OFF_FRAUDE = 1 << 36
 OFF_TESTE = 1 << 37
+OFF_CONVIDADO = 3 << 36
 DIA_IOS_INI, DIA_IOS_FIM = DIAS_HISTORICO - 62, DIAS_HISTORICO - 52  # H7
 JANELA_FRAUDE = 60  # H2
 JANELA_ATRASO = 42  # H4
@@ -62,7 +63,9 @@ def pedidos_normais(ctx: Ctx, rel, curvas):
         # H7: 30% dos pedidos iOS "somem" na janela do checkout quebrado
         .where(~((F.col("dispositivo") == "ios") & F.col("dia").between(DIA_IOS_INI, DIA_IOS_FIM - 1)
                  & (u(ctx, "ios_perdido", s) < 0.30)))
-        .withColumn("comprador_id", F.when(F.col("tem_dup") & (u(ctx, "usa_dup", s) < 0.4), F.col("comprador_dup_id"))
+        # checkout como convidado: cadastro novo a cada compra (a pessoa é a mesma)
+        .withColumn("convidado", F.col("compra_convidado") & (F.col("k") > 0) & (u(ctx, "usa_conv", s) < 0.5))
+        .withColumn("comprador_id", F.when(F.col("convidado"), embaralhar(F.lit(OFF_CONVIDADO) + F.col("seq")))
                     .otherwise(F.col("comprador_id")))
         .withColumn("tipo", F.lit("normal"))
     )
@@ -151,6 +154,22 @@ def pedidos_teste(ctx: Ctx, lojas):
                 F.lit("conta").alias("tipo_cadastro"), F.lit(None).cast("string").alias("canal_aquisicao"))
     )
     return t, comp
+
+
+def compradores_convidados(ctx: Ctx, normais):
+    """Um cadastro por checkout de convidado, com e-mail/CPF "sujos" como na vida real."""
+    s = "seq"
+    ue = u(ctx, "cv_email", s)
+    email = (F.when(ue < 0.50, F.col("email")).when(ue < 0.70, F.upper("email")).when(ue < 0.82, F.initcap("email"))
+             .when(ue < 0.92, F.concat("email", F.lit(" "))).otherwise(F.concat(F.lit(" "), "email")))
+    uc = u(ctx, "cv_cpf", s)
+    cpf = F.when(uc < 0.45, formatar_cpf(F.col("cpf"))).when(uc < 0.75, F.lit(None).cast("string")).otherwise(F.col("cpf"))
+    return normais.where("convidado").select(
+        "comprador_id", "loja_id",
+        F.when(u(ctx, "cv_nome", s) < 0.35, F.upper("nome")).otherwise(F.col("nome")).alias("nome"),
+        email.alias("email"), cpf.alias("cpf"), "telefone", "cep", "cidade", "uf",
+        F.date_format(F.timestamp_seconds(F.lit(ctx.inicio_s).cast("long") + F.col("dia") * SEG_DIA), "yyyy-MM-dd").alias("data_cadastro"),
+        F.lit("convidado").alias("tipo_cadastro"), "canal_aquisicao")
 
 
 COLS_PEDIDO = ["seq", "loja_id", "comprador_id", "pessoa_id", "rel_num", "tipo", "dia", "canal", "origem_trafego",
@@ -446,11 +465,12 @@ def rodar(ctx: Ctx):
     rel = ler_interno(ctx, "relacoes")
 
     normais = pedidos_normais(ctx, rel, curvas)
-    salvar_interno(ctx, normais.select(*COLS_PEDIDO), "pedidos_base_normais")
+    salvar_interno(ctx, normais.select(*COLS_PEDIDO, "convidado", "nome", "email", "cpf", "telefone", "cidade"), "pedidos_base_normais")
     normais = ler_interno(ctx, "pedidos_base_normais")
+    escrever_csv(ctx, compradores_convidados(ctx, normais), "compradores", modo="append")
     fraude, comp_fraude = pedidos_fraude(ctx, lojas, normais)
     teste, comp_teste = pedidos_teste(ctx, lojas)
-    base = normais.unionByName(teste.select(*COLS_PEDIDO))
+    base = normais.select(*COLS_PEDIDO).unionByName(teste.select(*COLS_PEDIDO))
     if fraude is not None:
         base = base.unionByName(fraude.select(*COLS_PEDIDO))
     salvar_interno(ctx, base, "pedidos_base")

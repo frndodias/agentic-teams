@@ -1,0 +1,15 @@
+resources:
+  jobs:
+    ecommerce_gold:
+      name: ecommerce_gold
+      description: "Recria só a gold (metric views g_*) a partir da silver."
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: gold
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/gold/criar_gold.py
+            parameters: [--catalog, "${var.catalog}", --schema, "${resources.schemas.ecommerce.name}"]

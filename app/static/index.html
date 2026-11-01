@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic Data Team</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="marca"><span class="logo">◆</span> Agentic Data Team <small>from data consumer to data creator</small></div>
+    <nav>
+      <button data-aba="conversa" class="ativa">💬 Conversa</button>
+      <button data-aba="time">🤖 Time ao vivo</button>
+      <button data-aba="revisao">🧑‍💻 Revisão <span id="badge-revisao" class="badge oculto">0</span></button>
+      <button data-aba="operacao">📊 Operação</button>
+    </nav>
+    <div id="usuario" class="usuario"></div>
+  </header>
+
+  <main>
+    <!-- CONVERSA -->
+    <section id="aba-conversa" class="aba ativa">
+      <div class="chat" id="chat"></div>
+      <div class="sugestoes" id="sugestoes"></div>
+      <form id="form-pergunta" class="entrada">
+        <input id="pergunta" autocomplete="off" placeholder="Pergunte sobre vendas, lojistas, pagamentos, clientes…" />
+        <button type="submit">Perguntar</button>
+      </form>
+    </section>
+
+    <!-- TIME AO VIVO -->
+    <section id="aba-time" class="aba">
+      <div class="barra">
+        <select id="sel-run"></select>
+        <div id="kpis-run" class="kpis"></div>
+      </div>
+      <div class="time-grid">
+        <div>
+          <div id="diagrama" class="diagrama"></div>
+          <div class="cartao"><h3>Plano do Supervisor</h3><div id="plano" class="md"></div></div>
+          <div class="cartao"><h3>Testes do Quality Agent</h3><table id="tab-dq" class="tabela"></table></div>
+        </div>
+        <div class="cartao timeline-wrap"><h3>Linha do tempo</h3><ol id="timeline" class="timeline"></ol></div>
+      </div>
+    </section>
+
+    <!-- REVISÃO -->
+    <section id="aba-revisao" class="aba">
+      <div class="rev-grid">
+        <aside class="cartao"><h3>Pull requests</h3><ul id="lista-revisao" class="lista"></ul></aside>
+        <div id="rev-detalhe" class="rev-detalhe"><div class="vazio">Selecione um PR para revisar.</div></div>
+      </div>
+    </section>
+
+    <!-- OPERAÇÃO -->
+    <section id="aba-operacao" class="aba">
+      <div id="op-kpis" class="kpis grandes"></div>
+      <div class="op-grid">
+        <div class="cartao"><h3>Por agente</h3><table id="op-agentes" class="tabela"></table></div>
+        <div class="cartao"><h3>Decisões humanas</h3><table id="op-aprov" class="tabela"></table>
+          <h3>Testes de qualidade</h3><table id="op-dq" class="tabela"></table></div>
+      </div>
+      <div class="cartao"><h3>Execuções</h3><table id="op-runs" class="tabela"></table></div>
+      <div id="op-links" class="links"></div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

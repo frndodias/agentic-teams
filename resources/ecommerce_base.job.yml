@@ -1,0 +1,34 @@
+resources:
+  jobs:
+    ecommerce_base:
+      name: ecommerce_recriar_base
+      description: "Recria a base mock inteira: gerador (landing) -> pipeline bronze/silver (full refresh) -> gold (metric views)."
+      max_concurrent_runs: 1
+      parameters:
+        - name: escala
+          default: ${var.escala}
+        - name: data_ancora
+          default: "hoje"
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: gerador
+          run_job_task:
+            job_id: ${resources.jobs.gerador.id}
+            job_parameters:
+              escala: "{{job.parameters.escala}}"
+              data_ancora: "{{job.parameters.data_ancora}}"
+        # o gerador reescreve a landing: o pipeline precisa reprocessar do zero
+        - task_key: pipeline
+          depends_on: [{task_key: gerador}]
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.ecommerce_pipeline.id}
+            full_refresh: true
+        - task_key: gold
+          depends_on: [{task_key: pipeline}]
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/gold/criar_gold.py
+            parameters: [--catalog, "${var.catalog}", --schema, "${resources.schemas.ecommerce.name}"]

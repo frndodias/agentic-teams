@@ -1,0 +1,39 @@
+resources:
+  apps:
+    agentic_teams_app:
+      name: agentic-teams
+      description: "Agentic Data Team: do consumidor ao criador de dados (Genie + time de agentes + revisão humana)."
+      source_code_path: ../app
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+        - name: postgres
+          postgres:
+            branch: projects/agentic-teams/branches/production
+            database: projects/agentic-teams/branches/production/databases/databricks-postgres
+            permission: CAN_CONNECT_AND_CREATE
+        - name: github-token
+          secret:
+            scope: agentic-teams
+            key: github_token
+            permission: READ
+        - name: job-promover
+          job:
+            id: ${resources.jobs.promover_produto.id}
+            permission: CAN_MANAGE_RUN
+        - name: genie
+          genie_space:
+            name: Nuvemshop Commerce
+            space_id: ${var.genie_space_id}
+            permission: CAN_RUN
+        - name: experimento
+          experiment:
+            experiment_id: ${resources.experiments.agentic_teams_experiment.id}
+            permission: CAN_EDIT
+        - name: artefatos
+          uc_securable:
+            securable_type: VOLUME
+            securable_full_name: ${var.catalog}.agentic_teams.artefatos
+            permission: WRITE_VOLUME

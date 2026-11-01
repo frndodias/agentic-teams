@@ -1,0 +1,6 @@
+resources:
+  schemas:
+    agentic_teams_sandbox:
+      catalog_name: ${var.catalog}
+      name: agentic_teams_sandbox
+      comment: "O que o time agêntico produz: objetos candidatos (s_*, g_*) criados pelos agentes antes do PR. Nunca usado pelo Genie."

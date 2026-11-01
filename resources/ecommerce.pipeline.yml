@@ -1,0 +1,15 @@
+resources:
+  pipelines:
+    ecommerce_pipeline:
+      name: ecommerce_pipeline
+      catalog: ${var.catalog}
+      schema: ${resources.schemas.ecommerce.name}
+      serverless: true
+      continuous: false
+      photon: true
+      channel: CURRENT
+      configuration:
+        landing: /Volumes/${var.catalog}/${resources.schemas.ecommerce.name}/landing
+      libraries:
+        - glob:
+            include: ../src/pipeline/**

@@ -298,8 +298,9 @@ def gerar_relacoes(ctx: Ctx, lojas, pessoas, curvas):
     rel = (
         rel.withColumn("t1", F.least(F.col("t0") + F.col("span"), F.col("fim_idx")))
         .withColumn("comprador_id", embaralhar(F.col("rel_num") * 2))
-        .withColumn("tem_dup", u(ctx, "dup", r) < 0.08)
-        .withColumn("comprador_dup_id", F.when(F.col("tem_dup"), embaralhar(F.col("rel_num") * 2 + 1)))
+        # Armadilha: parte dos recorrentes às vezes compra como convidado, e cada checkout de convidado
+        # cria um cadastro novo (ver etapa_pedidos). Pelo comprador_id cru, o recorrente vira vários "compradores de 1 pedido".
+        .withColumn("compra_convidado", F.col("recorrente") & (u(ctx, "conv", r) < 0.45))
         .withColumn("tipo_cadastro", F.when(u(ctx, "tipo_cad", r) < 0.75, "conta").otherwise("convidado"))
         .drop("q", "span", "u_t0")
     )
@@ -307,7 +308,7 @@ def gerar_relacoes(ctx: Ctx, lojas, pessoas, curvas):
 
 
 def compradores_de(ctx: Ctx, rel):
-    """Exporta os cadastros (1 por relação + duplicados de propósito). Retorna colunas do CSV."""
+    """Cadastro principal de cada relação (os cadastros de convidado nascem por pedido, na etapa pedidos)."""
     r = "rel_num"
     inicio = F.lit(ctx.inicio_s)
     cpf_principal = F.when(u(ctx, "cpf_fmt", r) < 0.2, formatar_cpf(F.col("cpf"))).otherwise(F.col("cpf"))
@@ -316,23 +317,7 @@ def compradores_de(ctx: Ctx, rel):
         "uf", data_texto(inicio + F.greatest(F.col("t0") - entre_int(u(ctx, "cad", r), 0, 30), F.col("inicio_ativo"))
                          * SEG_DIA).alias("data_cadastro"),
         "tipo_cadastro", "canal_aquisicao")
-    # Armadilha: mesma pessoa, segundo cadastro na mesma loja (conta x convidado, e-mail e CPF "sujos")
-    ue = u(ctx, "dup_email", r)
-    email_var = (F.when(ue < 0.30, F.upper("email")).when(ue < 0.55, F.initcap("email"))
-                 .when(ue < 0.75, F.concat("email", F.lit(" "))).when(ue < 0.85, F.concat(F.lit(" "), "email"))
-                 .otherwise(F.concat(F.element_at(F.split("email", "@"), 1), F.lit("@"),
-                                     F.upper(F.element_at(F.split("email", "@"), 2)))))
-    uc = u(ctx, "dup_cpf", r)
-    cpf_var = F.when(uc < 0.5, formatar_cpf(F.col("cpf"))).when(uc < 0.8, F.lit(None).cast("string")).otherwise(F.col("cpf"))
-    dup = rel.where("tem_dup").select(
-        F.col("comprador_dup_id").alias("comprador_id"), "loja_id",
-        F.when(u(ctx, "dup_nome", r) < 0.5, F.upper("nome")).otherwise(F.col("nome")).alias("nome"),
-        email_var.alias("email"), cpf_var.alias("cpf"), "telefone", "cep", "cidade", "uf",
-        data_texto(inicio + (F.col("t0") + F.floor(u(ctx, "dup_cad", r) * (F.col("t1") - F.col("t0") + 1)))
-                   .cast("int") * SEG_DIA).alias("data_cadastro"),
-        F.when(F.col("tipo_cadastro") == "conta", "convidado").otherwise("conta").alias("tipo_cadastro"),
-        "canal_aquisicao")
-    return principal.unionByName(dup)
+    return principal
 
 
 def rodar(ctx: Ctx):

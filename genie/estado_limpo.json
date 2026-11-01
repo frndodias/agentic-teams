@@ -1,0 +1,75 @@
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "10000000000000000000000000000000",
+        "question": [
+          "Qual foi o GMV por segmento no último mês?"
+        ]
+      },
+      {
+        "id": "10000000000000000000000000000001",
+        "question": [
+          "Como evoluiu a participação do Pix nos pagamentos nos últimos 12 meses?"
+        ]
+      },
+      {
+        "id": "10000000000000000000000000000002",
+        "question": [
+          "Quais lojas de Eletrônicos têm a maior taxa de chargeback nos últimos 90 dias?"
+        ]
+      },
+      {
+        "id": "10000000000000000000000000000003",
+        "question": [
+          "Qual transportadora gerou mais tickets de atraso nas últimas 6 semanas?"
+        ]
+      },
+      {
+        "id": "10000000000000000000000000000004",
+        "question": [
+          "Quantas lojas do plano Inicial cancelaram por mês no último ano?"
+        ]
+      }
+    ]
+  },
+  "data_sources": {
+    "metric_views": [
+      {
+        "identifier": "fc_catalog.ecommerce.g_disputas"
+      },
+      {
+        "identifier": "fc_catalog.ecommerce.g_funil"
+      },
+      {
+        "identifier": "fc_catalog.ecommerce.g_lojistas"
+      },
+      {
+        "identifier": "fc_catalog.ecommerce.g_marketing"
+      },
+      {
+        "identifier": "fc_catalog.ecommerce.g_pagamentos"
+      },
+      {
+        "identifier": "fc_catalog.ecommerce.g_pedidos"
+      },
+      {
+        "identifier": "fc_catalog.ecommerce.g_suporte"
+      },
+      {
+        "identifier": "fc_catalog.ecommerce.g_vendas"
+      }
+    ]
+  },
+  "instructions": {
+    "text_instructions": [
+      {
+        "id": "30000000000000000000000000000000",
+        "content": [
+          "Você é o analista de dados da plataforma de e-commerce (lojas/lojistas que vendem online). Responda em português do Brasil, de forma objetiva, com números formatados no padrão brasileiro (R$ 1.234,56; 12,3%).\nUse somente as metric views disponíveis e a função MEASURE() para as medidas.\nOnde encontrar:\n- Vendas por produto/categoria/marca: g_vendas (nível de item). GMV padrão = medida GMV (exclui pedidos cancelados e pendentes).\n- Pedidos, ticket médio, cancelamento, devolução, chargeback por loja/canal/dispositivo: g_pedidos.\n- Aprovação de pagamentos, recusas, Pix x cartão, parcelamento: g_pagamentos.\n- Chargebacks e MED (motivo, status, valor perdido): g_disputas.\n- Lojistas: lojas ativas, churn, MRR, plano: g_lojistas.\n- Atendimento (tickets, CSAT, transportadora do pedido): g_suporte.\n- Funil de navegação (últimos 90 dias): g_funil.\n- Mídia paga (investimento, ROAS, CPC): g_marketing.\n\"Último mês\" = último mês completo. \"Hoje\" = current_date().\n[LACUNA]IMPORTANTE: o modelo semântico ainda NÃO tem dados de compradores/clientes finais (recompra, recorrência, compradores ativos, clientes únicos, coorte, LTV, frequência de compra). Para essas perguntas, responda claramente que essa informação ainda não está disponível no modelo semântico e não tente aproximar com outras métricas (não use pedidos como proxy de clientes).[/LACUNA]"
+        ]
+      }
+    ]
+  }
+}

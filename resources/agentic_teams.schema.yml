@@ -1,0 +1,6 @@
+resources:
+  schemas:
+    agentic_teams:
+      catalog_name: ${var.catalog}
+      name: agentic_teams
+      comment: "Como o time agêntico trabalha: tools (UC Functions), model service (Unity Gateway), traces MLflow, histórico do Lakebase (lb_*_history) e avaliação."

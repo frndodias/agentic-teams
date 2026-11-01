@@ -1,0 +1,4 @@
+resources:
+  experiments:
+    agentic_teams_experiment:
+      name: /Users/${workspace.current_user.userName}/agentic-teams/mlflow-agentic-teams

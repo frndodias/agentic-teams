@@ -17,6 +17,18 @@ variables:
   seed:
     description: Seed do gerador (mesma seed = mesmos dados)
     default: "42"
+  pr_repo:
+    description: Repositório (owner/repo) onde os agentes abrem PR
+    default: frndodias/agentic-teams-pr
+  genie_space_id:
+    description: Genie space da base (criado a partir de genie/estado_limpo.json)
+    default: 01f1d57c70121680b1c43fd45367abfc
+  leitores:
+    description: Principais (vírgula) que recebem SELECT nos objetos promovidos. Hoje o SP do app; depois os grupos (ex.- negocio)
+    default: c6f492f3-4b1c-48e8-b972-bb2b8349f527
+  warehouse_id:
+    description: SQL warehouse do app e dos agentes
+    default: ed167610612860b6
 
 targets:
   # O host vem do profile local (~/.databrickscfg); nada de URL ou segredo no repositório.

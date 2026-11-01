@@ -1,0 +1,8 @@
+resources:
+  volumes:
+    artefatos:
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.agentic_teams.name}
+      name: artefatos
+      volume_type: MANAGED
+      comment: "Artefatos de cada execução do time agêntico (SQL, especificação, relatório de qualidade)."

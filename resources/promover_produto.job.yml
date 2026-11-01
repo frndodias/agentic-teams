@@ -1,0 +1,32 @@
+resources:
+  jobs:
+    promover_produto:
+      name: agentic_teams_promover_produto
+      description: "Deploy pós-merge: promove o produto de dados do sandbox para ecommerce e publica no Genie."
+      max_concurrent_runs: 3
+      parameters:
+        - name: produto
+          default: ""
+        - name: run_id
+          default: ""
+        - name: fonte
+          default: github
+        - name: repo
+          default: ${var.pr_repo}
+        - name: genie_space_id
+          default: ${var.genie_space_id}
+        - name: leitores
+          default: ${var.leitores}
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: promover
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/promover/promover.py
+            parameters: [--produto, "{{job.parameters.produto}}", --run_id, "{{job.parameters.run_id}}",
+                         --fonte, "{{job.parameters.fonte}}", --repo, "{{job.parameters.repo}}",
+                         --catalog, "${var.catalog}", --genie_space_id, "{{job.parameters.genie_space_id}}",
+                         --leitores, "{{job.parameters.leitores}}"]
