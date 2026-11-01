@@ -17,14 +17,33 @@ const ORDEM = ["supervisor", "discovery", "analyst", "engineer", "quality", "hum
 let CFG = {}, runAtual = null, conversaId = null;
 const acompanhados = new Set();
 
+// ---------------------------------------------------------------- menu lateral
+if (localStorage.getItem("menu_recolhido") === "1") document.body.classList.add("recolhido");
+$("#recolher").onclick = () => {
+  document.body.classList.toggle("recolhido");
+  localStorage.setItem("menu_recolhido", document.body.classList.contains("recolhido") ? "1" : "0");
+};
+
 // ---------------------------------------------------------------- abas
 document.querySelectorAll("nav button").forEach((b) => b.onclick = () => abrirAba(b.dataset.aba));
 function abrirAba(nome) {
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("ativa", x.dataset.aba === nome));
   document.querySelectorAll(".aba").forEach((x) => x.classList.toggle("ativa", x.id === `aba-${nome}`));
-  if (nome === "revisao") carregarRevisao();
-  if (nome === "operacao") carregarOperacao();
-  if (nome === "time") carregarRuns();
+  const carregar = { revisao: carregarRevisao, operacao: carregarOperacao, time: carregarRuns }[nome];
+  if (carregar) comCarga(nome, carregar);
+}
+
+// mostra "carregando…" e, se falhar, uma mensagem de erro em vez de tela vazia
+async function comCarga(nome, fn) {
+  const sec = $(`#aba-${nome}`);
+  sec.querySelectorAll(".erro-carga").forEach((e) => e.remove());
+  let aviso = null;
+  const t = setTimeout(() => { aviso = document.createElement("div"); aviso.className = "carregando"; aviso.textContent = "carregando…"; sec.prepend(aviso); }, 400);
+  try { await fn(); }
+  catch (e) {
+    const d = document.createElement("div"); d.className = "erro-carga";
+    d.textContent = `Não foi possível carregar: ${e.message}. Tente de novo em alguns segundos.`; sec.prepend(d);
+  } finally { clearTimeout(t); aviso?.remove(); }
 }
 
 // ---------------------------------------------------------------- conversa
@@ -213,12 +232,14 @@ async function desenharRun() {
       ${s.status === "em_andamento" ? " ⏳" : s.status === "erro" ? " ❌" : ""}${corpo}</li>`;
   }).join("");
 }
-setInterval(() => { if ($("#aba-time").classList.contains("ativa")) desenharRun(); }, 2000);
+setInterval(() => { if ($("#aba-time").classList.contains("ativa")) desenharRun().catch(() => {}); }, 2000);
+setInterval(() => atualizarBadge().catch(() => {}), 10000);
 
 // ---------------------------------------------------------------- revisão
 let revSel = null;
 async function atualizarBadge() {
   const runs = await api("/api/runs");
+  $("#dot-time").classList.toggle("oculto", !runs.some((r) => r.status.startsWith("aguardando")));
   const n = runs.filter((r) => r.status === "aguardando_revisao").length;
   $("#badge-revisao").textContent = n;
   $("#badge-revisao").classList.toggle("oculto", !n);
@@ -265,11 +286,18 @@ async function detalheRevisao() {
 async function carregarOperacao() {
   const [o, runs] = await Promise.all([api("/api/operacao"), api("/api/runs")]);
   const s = o.resumo || {};
-  $("#op-kpis").innerHTML = [["execuções", s.execucoes], ["concluídas", s.concluidas], ["PRs", s.prs], ["iterações médias", s.iteracoes_media],
-    ["minutos por execução", s.minutos_medio], ["tokens", ((+s.tokens_entrada || 0) + (+s.tokens_saida || 0)).toLocaleString("pt-BR")]]
+  $("#op-kpis").innerHTML = [["execuções", s.execucoes], ["concluídas", s.concluidas], ["PRs", s.prs], ["iterações médias", fmtCelula(s.iteracoes_media)],
+    ["minutos por execução", fmtCelula(s.minutos_medio)], ["tokens", ((+s.tokens_entrada || 0) + (+s.tokens_saida || 0)).toLocaleString("pt-BR")]]
     .map(([k, v]) => `<div class="kpi">${k}<b>${esc(v ?? 0)}</b></div>`).join("");
-  const tab = (el, linhas, cols) => { $(el).innerHTML = `<tr>${cols.map((c) => `<th>${c}</th>`).join("")}</tr>` + (linhas || []).map((l) => `<tr>${cols.map((c) => `<td>${esc(l[c] ?? "")}</td>`).join("")}</tr>`).join(""); };
-  tab("#op-agentes", o.por_agente, ["agente", "chamadas_llm", "tools", "tokens_entrada", "tokens_saida", "seg_medio"]);
+  const ROTULO = { agente: "Agente", chamadas_llm: "Chamadas ao LLM", tools: "Ferramentas", tokens_entrada: "Tokens de entrada",
+    tokens_saida: "Tokens de saída", seg_medio: "Tempo médio (s)", tipo: "Tipo", decisao: "Decisão", n: "Quantidade",
+    status: "Status", criado_em: "Início", pergunta: "Pergunta", iteracoes: "Iterações", produto: "Produto de dados" };
+  const fmt = (c, v) => c === "criado_em" && v ? new Date(v).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+    : c === "agente" && v ? v.charAt(0).toUpperCase() + v.slice(1) : fmtCelula(v);
+  const tab = (el, linhas, cols) => { $(el).innerHTML = `<tr>${cols.map((c) => `<th>${ROTULO[c] || c}</th>`).join("")}</tr>` +
+    (linhas || []).map((l) => `<tr>${cols.map((c) => `<td>${esc(fmt(c, l[c] ?? ""))}</td>`).join("")}</tr>`).join(""); };
+  tab("#op-agentes", (o.por_agente || []).filter((a) => !["genie", "humano"].includes(a.agente)),
+      ["agente", "chamadas_llm", "tools", "tokens_entrada", "tokens_saida", "seg_medio"]);
   tab("#op-aprov", o.aprovacoes, ["tipo", "decisao", "n"]);
   tab("#op-dq", o.dq, ["status", "n"]);
   tab("#op-runs", runs, ["criado_em", "pergunta", "status", "iteracoes", "produto", "tokens_saida"]);
@@ -280,7 +308,10 @@ async function carregarOperacao() {
 // ---------------------------------------------------------------- início
 (async () => {
   CFG = await api("/api/config");
-  $("#usuario").textContent = `${CFG.usuario} · ${CFG.modelo}`;
+  const iniciais = (CFG.nome || CFG.usuario).split(" ").filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join("");
+  $("#usuario").innerHTML = `<div class="avatar">${esc(iniciais)}</div><div><div class="nome">${esc(CFG.nome || CFG.usuario)}</div>
+    <div class="email">${esc(CFG.usuario)}${CFG.revisor ? " · revisor" : ""}</div></div>`;
+  $("#usuario").title = `Modelo: ${CFG.modelo}`;
   msg("Genie", "Olá! Pergunte sobre vendas, lojistas, pagamentos, disputas, atendimento ou marketing. Se eu não tiver o dado, o time de dados constrói. 🚀");
   const runs = await api("/api/runs");
   runs.filter((r) => !["concluido", "falhou", "rejeitado", "descartado"].includes(r.status)).forEach((r) => acompanhar(r.run_id));

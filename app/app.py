@@ -1,4 +1,5 @@
 """App agentic-teams: Conversa (negócio + Genie), Time ao vivo, Revisão (engenheiro) e Operação."""
+import os
 import threading
 import time
 import uuid
@@ -28,8 +29,25 @@ def _startup():
     threading.Thread(target=_vigiar_prs, daemon=True).start()
 
 
+_EU_LOCAL = None
+
+
 def _usuario(req: Request) -> str:
-    return (req.headers.get("x-forwarded-email") or req.headers.get("x-forwarded-preferred-username") or "local").lower()
+    global _EU_LOCAL
+    u = req.headers.get("x-forwarded-email") or req.headers.get("x-forwarded-preferred-username")
+    if not u and os.getenv("PREVIEW_LOCAL"):  # preview local: a identidade do profile do Databricks
+        _EU_LOCAL = _EU_LOCAL or dbx.w.current_user.me().user_name
+        u = _EU_LOCAL
+    return (u or "local").lower()
+
+
+def _nome(req: Request, email: str) -> str:
+    """Nome para exibição: header do Databricks Apps ou derivado do e-mail (fernando.custodio -> Fernando Custodio)."""
+    nome = req.headers.get("x-forwarded-preferred-username") or ""
+    if not nome or "@" in nome:
+        base = email.split("@")[0] if "@" in email else email
+        nome = " ".join(p.capitalize() for p in base.replace("_", ".").split(".") if p)
+    return nome
 
 
 def _revisor(req: Request) -> str:
@@ -195,7 +213,8 @@ def operacao():
 @app.get("/api/config")
 def config(req: Request):
     host = dbx.w.config.host.rstrip("/")
-    return {"usuario": _usuario(req), "github": gh.configurado(), "pr_repo": C.PR_REPO,
+    u = _usuario(req)
+    return {"usuario": u, "nome": _nome(req, u), "github": gh.configurado(), "pr_repo": C.PR_REPO,
             "genie_url": f"{host}/genie/rooms/{C.GENIE_SPACE_ID}" if C.GENIE_SPACE_ID else None,
             "experimento_url": f"{host}/ml/experiments/{C.MLFLOW_EXPERIMENT}" if C.MLFLOW_EXPERIMENT else None,
             "modelo": C.LLM_MODEL, "revisor": (not C.REVISORES) or _usuario(req) in C.REVISORES,

@@ -63,6 +63,8 @@ def iniciar():
         for stmt in (x.strip() for x in DDL.split(";")):
             if stmt:
                 c.execute(stmt)
+        # correção idempotente: perguntas importadas como JSON ("...") voltam a ser texto
+        c.execute("""UPDATE runs SET pergunta = (pergunta::jsonb #>> '{}') WHERE pergunta LIKE '"%"'""")
 
 
 DDL = """
@@ -282,7 +284,8 @@ def importar_historico(dados: dict) -> dict:
             linhas = novos if tabela == "runs" else [x for x in dados.get(tabela, []) if x.get("run_id") in ids]
             for x in linhas:
                 cs = cols or [k for k in x.keys()]
-                vals = [psycopg.types.json.Jsonb(x.get(k)) if k in _JSONB and x.get(k) is not None else x.get(k) for k in cs]
+                jsonb = _JSONB - ({"pergunta"} if tabela == "runs" else set())  # runs.pergunta é texto
+                vals = [psycopg.types.json.Jsonb(x.get(k)) if k in jsonb and x.get(k) is not None else x.get(k) for k in cs]
                 c.execute(f"INSERT INTO {tabela} ({', '.join(cs)}) VALUES ({', '.join(['%s'] * len(cs))})", vals)
             cont[tabela] = len(linhas)
     return cont
