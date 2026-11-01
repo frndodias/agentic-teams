@@ -174,6 +174,11 @@ def reset(req: Request):
 
 # ---------------------------------------------------------------- operação e config
 
+@app.get("/api/github/status")
+def github_status():
+    return gh.status()
+
+
 @app.get("/api/operacao")
 def operacao():
     return db.operacao()

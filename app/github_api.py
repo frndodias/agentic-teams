@@ -27,6 +27,18 @@ def configurado() -> bool:
     return bool(C.GITHUB_TOKEN) and len(C.GITHUB_TOKEN) > 20 and not C.GITHUB_TOKEN.startswith("nao_configurado")
 
 
+def status() -> dict:
+    """Diagnóstico: o token enxerga o repositório de PR e pode escrever?"""
+    if not configurado():
+        return {"configurado": False}
+    r = requests.get(f"{_API}/repos/{C.PR_REPO}", headers=_h(), timeout=30)
+    if r.status_code >= 400:
+        return {"configurado": True, "ok": False, "erro": f"{r.status_code} {r.text[:200]}"}
+    j = r.json()
+    return {"configurado": True, "ok": True, "repo": j["full_name"], "branch_padrao": j["default_branch"],
+            "pode_escrever": (j.get("permissions") or {}).get("push")}
+
+
 def criar_branch(nome: str) -> str:
     base = _req("GET", f"/git/ref/heads/{C.PR_BRANCH_BASE}")["object"]["sha"]
     try:
