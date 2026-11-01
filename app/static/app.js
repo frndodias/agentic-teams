@@ -115,21 +115,48 @@ function recomendada(opcao, rec) {
   return o === r || o.startsWith(r) || r.startsWith(o.slice(0, 25)) || (/^[A-Z]\)?$/.test(r) && o.startsWith(r.replace(")", "") + ")"));
 }
 
-function cartaoEsclarecimento(runId, d) {
-  const ap = d.aprovacoes.filter((a) => a.tipo === "esclarecimento" && a.status === "pendente").pop();
-  const perguntas = ap?.pergunta?.perguntas || [];
-  const html = `<div class="perguntas-card"><b>O Analyst Agent precisa de uma decisão sua:</b>${perguntas.map((p) => `
+function formEsclarecimento(runId, perguntas) {
+  return `<div class="perguntas-card"><b>O Analyst Agent precisa de uma decisão do negócio:</b>${perguntas.map((p) => `
       <div style="margin-top:10px">${esc(p.pergunta)}</div>
       <div class="opcoes">${p.opcoes.map((o) => { const r = recomendada(o, p.recomendada); return `<label><input type="radio" name="${esc(p.id)}" value="${esc(o)}" ${r ? "checked" : ""}>${esc(o)}${r ? '<span class="rec">recomendada</span>' : ""}</label>`; }).join("")}</div>`).join("")}
     <button class="primario">Responder</button></div>`;
-  const el = msg("Analyst Agent", html, "bot time");
-  el.querySelector("button").onclick = async (ev) => {
+}
+
+function ligarEsclarecimento(el, runId, perguntas) {
+  el.querySelector("button.primario").onclick = async (ev) => {
     ev.target.disabled = true;
     const respostas = {};
     perguntas.forEach((p) => { const sel = el.querySelector(`input[name="${p.id}"]:checked`); respostas[p.id] = sel ? sel.value : p.recomendada; });
     await api(`/api/runs/${runId}/esclarecimento`, { method: "POST", body: JSON.stringify({ respostas }) });
-    ev.target.textContent = "Respondido ✓";
+    document.querySelectorAll(".perguntas-card button.primario").forEach((b) => { b.disabled = true; b.textContent = "Respondido ✓"; });
   };
+}
+
+function cartaoEsclarecimento(runId, d) {
+  const ap = d.aprovacoes.filter((a) => a.tipo === "esclarecimento" && a.status === "pendente").pop();
+  const perguntas = ap?.pergunta?.perguntas || [];
+  const el = msg("Analyst Agent", formEsclarecimento(runId, perguntas), "bot time");
+  ligarEsclarecimento(el, runId, perguntas);
+}
+
+// cartão de decisão humana na aba Time ao vivo (renderiza uma vez por aprovação, para não perder a seleção)
+let acaoRenderizada = null;
+function desenharAcaoHumana(runId, d) {
+  const box = $("#acao-humana");
+  const ap = d.aprovacoes.filter((a) => a.status === "pendente").pop();
+  if (!ap) { box.innerHTML = ""; acaoRenderizada = null; return; }
+  if (acaoRenderizada === ap.approval_id) return;
+  acaoRenderizada = ap.approval_id;
+  if (ap.tipo === "esclarecimento") {
+    const perguntas = ap.pergunta?.perguntas || [];
+    box.innerHTML = `<div class="acao-humana"><h3>⏸ Aguardando decisão do negócio</h3>${formEsclarecimento(runId, perguntas)}</div>`;
+    ligarEsclarecimento(box, runId, perguntas);
+  } else {
+    box.innerHTML = `<div class="acao-humana"><h3>⏸ Aguardando revisão do engenheiro de dados</h3>
+      <div>O produto de dados foi construído e aprovado pelo Quality Agent. ${d.run.pr_url ? `<a href="${esc(d.run.pr_url)}" target="_blank">PR #${d.run.pr_numero}</a>` : "PR pronto"}.</div>
+      <div class="acoes"><button class="primario">Abrir revisão →</button></div></div>`;
+    box.querySelector("button").onclick = () => { revSel = runId; abrirAba("revisao"); detalheRevisao(); };
+  }
 }
 
 // ---------------------------------------------------------------- time ao vivo
@@ -149,9 +176,12 @@ async function desenharRun() {
   const d = await api(`/api/runs/${runAtual}`);
   const r = d.run;
   const ativo = ETAPA_AGENTE[r.etapa] || (r.status === "concluido" ? null : "supervisor");
+  const esperando = r.status.startsWith("aguardando");
+  desenharAcaoHumana(runAtual, d);
   const vistos = new Set(d.steps.map((s) => s.agente));
-  $("#diagrama").innerHTML = AGENTES.map(([k, ic, nm]) => `<div class="agente ${k === ativo && r.status !== "concluido" ? "ativo" : vistos.has(k) ? "feito" : ""}">
-      <div class="ic">${ic}</div><div class="nm">${nm}</div><div class="st">${k === ativo && r.status !== "concluido" ? "trabalhando…" : vistos.has(k) ? "✓" : "—"}</div></div>`).join("");
+  const estAtivo = (k) => k === ativo && r.status !== "concluido";
+  $("#diagrama").innerHTML = AGENTES.map(([k, ic, nm]) => `<div class="agente ${estAtivo(k) ? (esperando ? "espera" : "ativo") : vistos.has(k) ? "feito" : ""}">
+      <div class="ic">${ic}</div><div class="nm">${nm}</div><div class="st">${estAtivo(k) ? (esperando ? "aguardando você" : "trabalhando…") : vistos.has(k) ? "✓" : "—"}</div></div>`).join("");
   const dur = r.criado_em ? Math.round(((r.finalizado_em ? new Date(r.finalizado_em) : new Date()) - new Date(r.criado_em)) / 1000) : 0;
   $("#kpis-run").innerHTML = [
     ["status", r.status], ["iteração", r.iteracoes || 0], ["tokens", ((r.tokens_entrada || 0) + (r.tokens_saida || 0)).toLocaleString("pt-BR")],

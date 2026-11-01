@@ -75,3 +75,8 @@ table.tabela { width:100%; border-collapse:collapse; font-size:13px; }
 .op-grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:16px; }
 .links a { color:var(--azul); margin-right:16px; font-size:13px; }
 .aviso { background:#3a2a10; border:1px solid #6b4f1a; color:#f2d49b; border-radius:10px; padding:10px 12px; font-size:13px; margin-bottom:12px; }
+
+.acao-humana { border:1px solid var(--laranja); background:#2a1712; border-radius:12px; padding:14px 16px; margin-bottom:16px;
+  box-shadow:0 0 24px rgba(255,95,70,.18); }
+.acao-humana h3 { color:var(--laranja); margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; }
+.agente.espera { border-color:var(--amarelo); box-shadow:0 0 0 2px rgba(242,193,78,.35); }
