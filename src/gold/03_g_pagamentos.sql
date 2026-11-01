@@ -21,9 +21,9 @@ AS $$
     - name: Hora do Dia
       expr: "HOUR(source.criado_em)"
     - name: Meio de Pagamento
-      expr: source.meio
+      expr: "CASE source.meio WHEN 'pix' THEN 'Pix' WHEN 'cartao_credito' THEN 'Cartão de crédito' WHEN 'cartao_debito' THEN 'Cartão de débito' WHEN 'boleto' THEN 'Boleto' WHEN 'carteira_digital' THEN 'Carteira digital' ELSE source.meio END"
     - name: Status do Pagamento
-      expr: source.status
+      expr: "INITCAP(source.status)"
     - name: Motivo da Recusa
       expr: source.motivo_recusa
     - name: Parcelas

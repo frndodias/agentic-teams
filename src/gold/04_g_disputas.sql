@@ -23,7 +23,7 @@ AS $$
     - name: Motivo
       expr: source.motivo
     - name: Status
-      expr: source.status
+      expr: "INITCAP(source.status)"
     - name: Loja
       expr: dim_pedido.dim_loja.nome_loja
     - name: ID Loja

@@ -31,4 +31,4 @@ resources:
           environment_key: default
           spark_python_task:
             python_file: ../src/gold/criar_gold.py
-            parameters: [--catalog, "${var.catalog}", --schema, "${resources.schemas.ecommerce.name}"]
+            parameters: [--catalog, "${var.catalog}", --schema, "${resources.schemas.ecommerce.name}", --leitores, "${var.leitores}"]

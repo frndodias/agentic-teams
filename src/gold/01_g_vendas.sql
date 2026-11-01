@@ -46,11 +46,11 @@ AS $$
     - name: Canal
       expr: dim_pedido.canal
     - name: Origem do Tráfego
-      expr: dim_pedido.origem_trafego
+      expr: "CASE dim_pedido.origem_trafego WHEN 'organico' THEN 'Busca orgânica' WHEN 'direto' THEN 'Direto' WHEN 'email' THEN 'E-mail' WHEN 'ads_meta' THEN 'Anúncios Meta' WHEN 'ads_google' THEN 'Anúncios Google' WHEN 'whatsapp' THEN 'WhatsApp' WHEN 'social' THEN 'Redes sociais' WHEN 'marketplace' THEN 'Marketplace' ELSE dim_pedido.origem_trafego END"
     - name: Dispositivo
-      expr: dim_pedido.dispositivo
+      expr: "CASE dim_pedido.dispositivo WHEN 'ios' THEN 'iOS' WHEN 'android' THEN 'Android' WHEN 'desktop' THEN 'Desktop' ELSE dim_pedido.dispositivo END"
     - name: Status do Pedido
-      expr: dim_pedido.status_pedido
+      expr: "INITCAP(dim_pedido.status_pedido)"
   measures:
     - name: GMV Bruto
       expr: SUM(source.quantidade * source.preco_unitario - source.desconto_item)

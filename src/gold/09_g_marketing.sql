@@ -25,7 +25,7 @@ AS $$
     - name: Mês
       expr: "DATE_TRUNC('MONTH', source.data)"
     - name: Plataforma
-      expr: source.canal_midia
+      expr: "CASE source.canal_midia WHEN 'meta' THEN 'Meta' WHEN 'google' THEN 'Google' ELSE source.canal_midia END"
     - name: Campanha
       expr: source.campanha
     - name: Loja

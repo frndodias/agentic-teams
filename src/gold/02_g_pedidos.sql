@@ -36,11 +36,11 @@ AS $$
     - name: Canal
       expr: source.canal
     - name: Origem do Tráfego
-      expr: source.origem_trafego
+      expr: "CASE source.origem_trafego WHEN 'organico' THEN 'Busca orgânica' WHEN 'direto' THEN 'Direto' WHEN 'email' THEN 'E-mail' WHEN 'ads_meta' THEN 'Anúncios Meta' WHEN 'ads_google' THEN 'Anúncios Google' WHEN 'whatsapp' THEN 'WhatsApp' WHEN 'social' THEN 'Redes sociais' WHEN 'marketplace' THEN 'Marketplace' ELSE source.origem_trafego END"
     - name: Dispositivo
-      expr: source.dispositivo
+      expr: "CASE source.dispositivo WHEN 'ios' THEN 'iOS' WHEN 'android' THEN 'Android' WHEN 'desktop' THEN 'Desktop' ELSE source.dispositivo END"
     - name: Status do Pedido
-      expr: source.status_pedido
+      expr: "INITCAP(source.status_pedido)"
     - name: Usou Cupom
       expr: "source.cupom IS NOT NULL"
   measures:
