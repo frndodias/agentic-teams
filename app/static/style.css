@@ -36,18 +36,21 @@ nav button:hover, .recolher:hover { background: var(--superficie); color: var(--
 nav button.ativa { color: var(--primario); background: var(--primario-superficie); font-weight: 600; }
 nav button .badge { margin-left: auto; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--alerta); margin-left: auto; box-shadow: 0 0 0 3px var(--alerta-superficie); }
-.slogan { margin-top: auto; color: var(--suave); font-size: 11px; padding: 8px 12px; line-height: 1.4; }
-.usuario { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: default; padding: 10px 8px;
-  border-top: 1px solid var(--borda); white-space: nowrap; overflow: hidden; }
+.slogan { margin-top: auto; color: var(--suave); font-size: 11px; padding: 8px 12px; line-height: 1.4; border-top: 1px solid var(--borda); }
+.topo { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: -4px 0 18px; }
+.topo h1 { margin: 0; font-size: 22px; color: var(--primario-texto); font-weight: 700; }
+.subtitulo { color: var(--suave); font-size: 13px; margin-top: 2px; }
+.usuario { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: default; padding: 6px 14px 6px 6px;
+  white-space: nowrap; background: var(--fundo); border: 1px solid var(--borda); border-radius: 999px; box-shadow: var(--sombra); }
 .usuario .avatar { width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--primario); color: #fff; display: flex;
   align-items: center; justify-content: center; font-weight: 700; font-size: 13px; letter-spacing: .02em; }
 .usuario .nome { font-weight: 600; color: var(--primario-texto); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; }
 .usuario .email { color: var(--suave); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
 .recolher { color: var(--suave); font-size: 12px; }
-body.recolhido .rotulo, body.recolhido .usuario > div:not(.avatar), body.recolhido nav button .badge { display: none; }
+body.recolhido .rotulo, body.recolhido nav button .badge { display: none; }
 body.recolhido .recolher svg { transform: rotate(180deg); }
 body.recolhido .marca { justify-content: center; padding: 4px 0 16px; }
-body.recolhido nav button, body.recolhido .recolher, body.recolhido .usuario { justify-content: center; }
+body.recolhido nav button, body.recolhido .recolher { justify-content: center; }
 body.recolhido nav button .dot { position: absolute; top: 6px; right: 8px; }
 .badge { background: var(--primario); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px; }
 .oculto { display: none !important; }
@@ -164,4 +167,4 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
 .links a { margin-right: 16px; font-size: 13px; font-weight: 600; }
 .aviso { background: var(--alerta-superficie); border: 1px solid var(--alerta); color: var(--alerta-texto); border-radius: var(--r2);
   padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
-body.recolhido .usuario { margin-top: auto; }
+body.recolhido .recolher { margin-top: auto; }

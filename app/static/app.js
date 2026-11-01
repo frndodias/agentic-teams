@@ -26,7 +26,15 @@ $("#recolher").onclick = () => {
 
 // ---------------------------------------------------------------- abas
 document.querySelectorAll("nav button").forEach((b) => b.onclick = () => abrirAba(b.dataset.aba));
+const TITULOS = {
+  conversa: ["Conversa", "Pergunte ao Genie; se o dado não existir, o time de dados constrói."],
+  time: ["Time ao vivo", "Supervisor, Discovery, Analyst, Engineer e Quality trabalhando — com pausas para decisões humanas."],
+  revisao: ["Revisão", "O engenheiro de dados revisa o PR, os testes e as decisões antes de publicar."],
+  operacao: ["Operação", "Custo, tempo, retrabalho e decisões humanas do time agêntico."],
+};
 function abrirAba(nome) {
+  $("#titulo-aba").textContent = TITULOS[nome][0];
+  $("#subtitulo-aba").textContent = TITULOS[nome][1];
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("ativa", x.dataset.aba === nome));
   document.querySelectorAll(".aba").forEach((x) => x.classList.toggle("ativa", x.id === `aba-${nome}`));
   const carregar = { revisao: carregarRevisao, operacao: carregarOperacao, time: carregarRuns }[nome];
