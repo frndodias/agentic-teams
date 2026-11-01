@@ -4,6 +4,7 @@ resources:
       name: agentic_teams_promover_produto
       description: "Deploy pós-merge: promove o produto de dados do sandbox para ecommerce e publica no Genie."
       max_concurrent_runs: 3
+      performance_target: PERFORMANCE_OPTIMIZED
       parameters:
         - name: produto
           default: ""

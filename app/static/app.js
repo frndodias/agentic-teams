@@ -44,10 +44,18 @@ function msg(quem, html, classe = "bot") {
   $("#chat").scrollTop = 1e9;
   return d;
 }
+// números no padrão brasileiro: inteiros com milhar, decimais com 1 casa (percentuais/taxas com 1-2 casas)
+function fmtCelula(v) {
+  if (v === null || v === undefined || v === "" || !/^-?\d+(\.\d+)?$/.test(String(v))) return v ?? "";
+  const n = Number(v);
+  if (Number.isInteger(n)) return n.toLocaleString("pt-BR");
+  const casas = Math.abs(n) < 1 ? 3 : Math.abs(n) < 100 ? 1 : 2;
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: casas === 3 ? 1 : casas, maximumFractionDigits: casas });
+}
 function tabelaHtml(cols, linhas) {
   if (!cols?.length) return "";
   return `<table class="tabela"><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>${
-    (linhas || []).slice(0, 20).map((l) => `<tr>${l.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</table>`;
+    (linhas || []).slice(0, 50).map((l) => `<tr>${l.map((v) => `<td>${esc(fmtCelula(v))}</td>`).join("")}</tr>`).join("")}</table>`;
 }
 
 $("#form-pergunta").onsubmit = async (e) => {
