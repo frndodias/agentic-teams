@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/common.min.js"></script>
 </head>
 <body>
   <aside class="sidebar" id="sidebar">
@@ -48,10 +50,10 @@
         <select id="sel-run"></select>
         <div id="kpis-run" class="kpis"></div>
       </div>
+      <div id="diagrama" class="fluxo"></div>
+      <div id="acao-humana"></div>
       <div class="time-grid">
         <div>
-          <div id="diagrama" class="diagrama"></div>
-          <div id="acao-humana"></div>
           <div class="cartao"><h3>Plano do Supervisor</h3><div id="plano" class="md"></div></div>
           <div class="cartao"><h3>Testes do Quality Agent</h3><table id="tab-dq" class="tabela"></table></div>
         </div>
@@ -71,9 +73,10 @@
     <section id="aba-operacao" class="aba">
       <div id="op-kpis" class="kpis grandes"></div>
       <div class="op-grid">
-        <div class="cartao"><h3>Por agente</h3><table id="op-agentes" class="tabela"></table></div>
-        <div class="cartao"><h3>Decisões humanas</h3><table id="op-aprov" class="tabela"></table>
-          <h3>Testes de qualidade</h3><table id="op-dq" class="tabela"></table></div>
+        <div class="cartao"><h3>Tokens por agente</h3><div id="op-barras" class="hbars"></div>
+          <details class="ver-tabela"><summary>ver tabela</summary><table id="op-agentes" class="tabela"></table></details></div>
+        <div class="cartao"><h3>Testes de qualidade</h3><div id="op-dq"></div>
+          <h3 style="margin-top:18px">Decisões humanas</h3><table id="op-aprov" class="tabela"></table></div>
       </div>
       <div class="cartao"><h3>Execuções</h3><table id="op-runs" class="tabela"></table></div>
       <div id="op-links" class="links"></div>

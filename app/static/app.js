@@ -7,13 +7,24 @@ const api = async (url, opts = {}) => {
   if (!r.ok) throw new Error((await r.text()) || r.statusText);
   return r.json();
 };
-const AGENTES = [
-  ["supervisor", "🧭", "Supervisor"], ["discovery", "🔎", "Discovery"], ["analyst", "📐", "Analyst"],
-  ["engineer", "🛠️", "Engineer"], ["quality", "🧪", "Quality"], ["humano", "🧑‍💻", "Humano"],
-];
-const ETAPA_AGENTE = { supervisor: "supervisor", discovery: "discovery", analyst: "analyst", engineer: "engineer", quality: "quality",
-  pull_request: "engineer", aguardando_esclarecimento: "humano", aguardando_revisao: "humano", promover: "supervisor", genie: "supervisor" };
-const ORDEM = ["supervisor", "discovery", "analyst", "engineer", "quality", "humano"];
+const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICONE = {
+  supervisor: svg('<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>'),
+  discovery: svg('<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>'),
+  analyst: svg('<path d="M4 20h16M6 16l4-6 3 3 5-7"/>'),
+  negocio: svg('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M17.5 4.5l1.5-1.5M19.5 7H21"/>'),
+  engineer: svg('<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>'),
+  quality: svg('<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6A2 2 0 0 0 19 18l-5-9V3"/><path d="M7.5 15h9"/>'),
+  engenheiro: svg('<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5v7M18 15.5V10a3 3 0 0 0-3-3h-4"/>'),
+};
+// ordem do fluxo (os humanos aparecem onde o time pausa); nomes sempre visíveis junto da cor
+const FLUXO = [["supervisor", "Supervisor", "planeja e coordena"], ["discovery", "Discovery", "descobre fontes e regras"],
+  ["analyst", "Analyst", "especifica"], ["negocio", "Negócio", "decide as definições"], ["engineer", "Engineer", "constrói no sandbox"],
+  ["quality", "Quality", "testa de forma independente"], ["engenheiro", "Engenheiro", "revisa e aprova o PR"]];
+const NOME_AGENTE = Object.fromEntries(FLUXO.map(([k, n]) => [k, n]));
+NOME_AGENTE.humano = "Humano"; NOME_AGENTE.genie = "Genie";
+const ETAPA_NO = { supervisor: "supervisor", discovery: "discovery", analyst: "analyst", engineer: "engineer", quality: "quality",
+  pull_request: "engineer", aguardando_esclarecimento: "negocio", aguardando_revisao: "engenheiro", promover: "supervisor", genie: "supervisor" };
 let CFG = {}, runAtual = null, conversaId = null;
 const acompanhados = new Set();
 
@@ -79,10 +90,20 @@ function fmtCelula(v) {
   const casas = Math.abs(n) < 1 ? 3 : Math.abs(n) < 100 ? 1 : 2;
   return n.toLocaleString("pt-BR", { minimumFractionDigits: casas === 3 ? 1 : casas, maximumFractionDigits: casas });
 }
+const NUM = (v) => v !== null && v !== "" && /^-?\d+(\.\d+)?$/.test(String(v));
+function cabecalho(c) { const t = String(c).replace(/_/g, " ").replace(/\bpct\b/i, "(%)"); return t.charAt(0).toUpperCase() + t.slice(1); }
+// coluna de barra: a última coluna toda numérica (normalmente a taxa / o valor que responde a pergunta)
 function tabelaHtml(cols, linhas) {
   if (!cols?.length) return "";
-  return `<table class="tabela"><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>${
-    (linhas || []).slice(0, 50).map((l) => `<tr>${l.map((v) => `<td>${esc(fmtCelula(v))}</td>`).join("")}</tr>`).join("")}</table>`;
+  linhas = (linhas || []).slice(0, 50);
+  let barra = -1;
+  for (let j = cols.length - 1; j >= 0; j--) if (linhas.length && linhas.every((l) => NUM(l[j]))) { barra = j; break; }
+  const max = barra >= 0 ? Math.max(...linhas.map((l) => Math.abs(Number(l[barra])))) || 1 : 1;
+  return `<div class="tabela-wrap"><table class="tabela">
+    <tr>${cols.map((c, j) => `<th class="${NUM(linhas[0]?.[j]) ? "num" : ""}">${esc(cabecalho(c))}</th>`).join("")}</tr>${
+    linhas.map((l) => `<tr>${l.map((v, j) => j === barra
+      ? `<td class="num" title="${esc(l[0])}: ${esc(fmtCelula(v))}"><div class="barra-dado"><span style="width:${(Math.abs(Number(v)) / max * 100).toFixed(1)}%"></span><b>${esc(fmtCelula(v))}</b></div></td>`
+      : `<td class="${NUM(v) ? "num" : ""}">${esc(fmtCelula(v))}</td>`).join("")}</tr>`).join("")}</table></div>`;
 }
 
 $("#form-pergunta").onsubmit = async (e) => {
@@ -207,36 +228,65 @@ async function carregarRuns() {
 
 function fmtHora(t) { return t ? new Date(t).toLocaleTimeString("pt-BR") : ""; }
 
+function chip(agente) { return `<span class="chip ag-${esc(agente)}">${esc(NOME_AGENTE[agente] || agente)}</span>`; }
+
 async function desenharRun() {
   if (!runAtual) { $("#timeline").innerHTML = '<div class="vazio">Nenhuma execução ainda. Faça uma pergunta na Conversa.</div>'; return; }
   const d = await api(`/api/runs/${runAtual}`);
   const r = d.run;
-  const ativo = ETAPA_AGENTE[r.etapa] || (r.status === "concluido" ? null : "supervisor");
+  const fim = ["concluido", "rejeitado", "descartado", "falhou"].includes(r.status);
+  const ativo = fim ? null : ETAPA_NO[r.etapa] || "supervisor";
   const esperando = r.status.startsWith("aguardando");
   desenharAcaoHumana(runAtual, d);
-  const vistos = new Set(d.steps.map((s) => s.agente));
-  const estAtivo = (k) => k === ativo && r.status !== "concluido";
-  $("#diagrama").innerHTML = AGENTES.map(([k, ic, nm]) => `<div class="agente ${estAtivo(k) ? (esperando ? "espera" : "ativo") : vistos.has(k) ? "feito" : ""}">
-      <div class="ic">${ic}</div><div class="nm">${nm}</div><div class="st">${estAtivo(k) ? (esperando ? "aguardando você" : "trabalhando…") : vistos.has(k) ? "✓" : "—"}</div></div>`).join("");
+  // estatísticas por nó
+  const est = {};
+  d.steps.forEach((s) => { const e = (est[s.agente] ||= { tools: 0, tokens: 0 }); if (s.acao === "tool") e.tools++; e.tokens += (s.tokens_entrada || 0) + (s.tokens_saida || 0); });
+  const respondida = (tipo) => d.aprovacoes.some((a) => a.tipo === tipo && a.status === "respondida");
+  const feito = (k) => k === "negocio" ? respondida("esclarecimento") : k === "engenheiro" ? respondida("pr") : !!est[k];
+  const no = ([k, nome, papel]) => {
+    const cls = k === ativo ? (esperando ? "espera" : "ativo") : feito(k) ? "feito" : "";
+    const st = k === ativo ? (esperando ? "aguardando você" : "trabalhando…") : feito(k) ? "concluído" : "aguardando";
+    const info = est[k] && (est[k].tools || est[k].tokens) ? `<div class="info">${est[k].tools} ferramentas · ${(est[k].tokens / 1000).toFixed(0)}k tokens</div>` : `<div class="info">${papel}</div>`;
+    return `<div class="no ${cls} ${["negocio", "engenheiro"].includes(k) ? "humano" : ""}"><div class="ic ag-${k}">${ICONE[k]}</div>
+      <div class="nm">${nome}</div><div class="st">${st}</div>${info}</div>`;
+  };
+  const seta = (loop) => `<div class="seta ${loop ? "loop" : ""}">${loop ? `<span>⇄ ${Math.max(1, r.iteracoes || 0)}x</span>` : ""}</div>`;
+  $("#diagrama").innerHTML = FLUXO.map((n, i) => (i ? seta(FLUXO[i - 1][0] === "engineer") : "") + no(n)).join("");
   const dur = r.criado_em ? Math.round(((r.finalizado_em ? new Date(r.finalizado_em) : new Date()) - new Date(r.criado_em)) / 1000) : 0;
+  const ROT_STATUS = { em_andamento: "em andamento", aguardando_esclarecimento: "aguardando o negócio", aguardando_revisao: "aguardando revisão",
+    concluido: "concluído", falhou: "falhou", rejeitado: "rejeitado", descartado: "descartado" };
   $("#kpis-run").innerHTML = [
-    ["status", r.status], ["iteração", r.iteracoes || 0], ["tokens", ((r.tokens_entrada || 0) + (r.tokens_saida || 0)).toLocaleString("pt-BR")],
-    ["tempo", `${Math.floor(dur / 60)}m${String(dur % 60).padStart(2, "0")}s`], ["PR", r.pr_url ? `<a href="${esc(r.pr_url)}" target="_blank">#${r.pr_numero}</a>` : "—"],
-  ].map(([k, v]) => `<div class="kpi">${k}<b>${typeof v === "string" && v.startsWith("<a") ? v : esc(v)}</b></div>`).join("");
+    ["Status", `<span class="pill st-${esc(r.status)}">${esc(ROT_STATUS[r.status] || r.status)}</span>`], ["Iterações", r.iteracoes || 0],
+    ["Tokens", ((r.tokens_entrada || 0) + (r.tokens_saida || 0)).toLocaleString("pt-BR")],
+    ["Tempo", `${Math.floor(dur / 60)}m${String(dur % 60).padStart(2, "0")}s`],
+    ["Pull request", r.pr_url ? `<a href="${esc(r.pr_url)}" target="_blank">#${r.pr_numero} ↗</a>` : "—"],
+  ].map(([k, v]) => `<div class="kpi">${k}<b>${String(v).startsWith("<") ? v : esc(v)}</b></div>`).join("");
   $("#plano").innerHTML = md(r.plano || "<i>…</i>");
-  $("#tab-dq").innerHTML = d.dq.length ? `<tr><th>it.</th><th>teste</th><th>status</th><th>evidência</th></tr>${d.dq.map((t) => `<tr><td>${t.iteracao}</td><td>${esc(t.teste)}</td>
-      <td class="st-${t.status}">${esc(t.status)}</td><td>${esc((t.evidencia || "").slice(0, 220))}</td></tr>`).join("")}` : "<tr><td class='vazio'>ainda sem testes</td></tr>";
-  const itens = d.steps.filter((s) => !(s.acao === "llm" && !(s.detalhe?.texto || "").trim())).slice(-120).reverse();
-  $("#timeline").innerHTML = itens.map((s) => {
+  $("#tab-dq").innerHTML = d.dq.length ? `<tr><th>It.</th><th>Teste</th><th>Status</th><th>Evidência</th></tr>${d.dq.map((t) => `<tr><td>${t.iteracao}</td><td>${esc(t.teste)}</td>
+      <td><span class="pill st-${t.status}">${t.status === "passou" ? "✓ passou" : "✕ falhou"}</span></td><td>${esc((t.evidencia || "").slice(0, 220))}</td></tr>`).join("")}`
+    : "<tr><td class='vazio'>ainda sem testes</td></tr>";
+  // linha do tempo: agrupa chamadas de ferramenta seguidas do mesmo agente
+  const passos = d.steps.filter((s) => !(s.acao === "llm" && !(s.detalhe?.texto || "").trim()) && s.acao !== "agente");
+  const grupos = [];
+  passos.forEach((s) => { const g = grupos[grupos.length - 1];
+    if (s.acao === "tool" && g?.tools && g.agente === s.agente) g.tools.push(s); else grupos.push(s.acao === "tool" ? { agente: s.agente, tools: [s], iniciado_em: s.iniciado_em } : s); });
+  $("#timeline").innerHTML = grupos.slice(-80).reverse().map((s) => {
+    if (s.tools) {
+      const cont = {}; s.tools.forEach((t) => cont[t.titulo] = (cont[t.titulo] || 0) + 1);
+      const resumo = Object.entries(cont).map(([n, c]) => `${n}${c > 1 ? ` ×${c}` : ""}`).join(" · ");
+      const erros = s.tools.filter((t) => t.status === "erro").length;
+      return `<li class="${esc(s.agente)}"><span class="t">${fmtHora(s.iniciado_em)}</span> ${chip(s.agente)}
+        <details><summary>🔧 ${s.tools.length} ferramenta${s.tools.length > 1 ? "s" : ""}: ${esc(resumo)}${erros ? ` <span class="st-falhou">(${erros} com erro)</span>` : ""}</summary>
+        ${s.tools.map((t) => `<div class="tool"><b>${esc(t.titulo)}</b>${t.status === "erro" ? " ❌" : ""}<pre>${esc(JSON.stringify(t.detalhe?.args || {}, null, 1)).slice(0, 700)}${t.detalhe?.saida ? "\n→ " + esc(String(t.detalhe.saida).slice(0, 600)) : ""}</pre></div>`).join("")}
+        </details></li>`;
+    }
     let corpo = "";
-    if (s.acao === "tool") corpo = `<pre>${esc(JSON.stringify(s.detalhe?.args || {}, null, 1)).slice(0, 900)}${s.detalhe?.saida ? "\n→ " + esc(String(s.detalhe.saida).slice(0, 700)) : ""}</pre>`;
-    else if (s.acao === "llm") corpo = `<div class="md">${md(String(s.detalhe?.texto || "").slice(0, 1500))}</div>`;
-    else if (s.acao === "handoff") corpo = `<div>${esc(s.detalhe?.motivo || "")}</div>`;
+    if (s.acao === "llm") corpo = `<div class="md">${md(String(s.detalhe?.texto || "").slice(0, 1500))}</div>`;
+    else if (s.acao === "handoff") corpo = `<div class="handoff">${esc(s.detalhe?.motivo || "")}</div>`;
     else if (s.acao === "erro") corpo = `<pre class="st-erro">${esc(s.detalhe?.erro || "")}</pre>`;
-    else if (s.acao === "especificacao") corpo = `<pre>${esc(JSON.stringify(s.detalhe, null, 1)).slice(0, 1500)}</pre>`;
+    else if (s.acao === "especificacao") corpo = `<details><summary>ver especificação</summary><pre>${esc(JSON.stringify(s.detalhe, null, 1)).slice(0, 3000)}</pre></details>`;
     else if (s.detalhe?.texto) corpo = `<div class="md">${md(s.detalhe.texto)}</div>`;
-    const ag = s.agente === "humano" ? "humano" : s.agente;
-    return `<li class="${esc(ag)}"><span class="t">${fmtHora(s.iniciado_em)}</span> · <span class="ag">${esc(s.agente)}</span> · ${esc(s.titulo)}
+    return `<li class="${esc(s.agente)}"><span class="t">${fmtHora(s.iniciado_em)}</span> ${chip(s.agente)} <span class="titulo-passo">${esc(s.titulo)}</span>
       ${s.status === "em_andamento" ? " ⏳" : s.status === "erro" ? " ❌" : ""}${corpo}</li>`;
   }).join("");
 }
@@ -263,30 +313,62 @@ async function detalheRevisao() {
   const [d, pr] = await Promise.all([api(`/api/runs/${revSel}`), api(`/api/runs/${revSel}/pr`)]);
   const r = d.run;
   const espec = d.steps.filter((s) => s.acao === "especificacao").pop()?.detalhe || {};
-  const decisoes = d.aprovacoes.filter((a) => a.tipo === "esclarecimento" && a.resposta).map((a) => a.resposta);
-  const q = d.artefatos.find((a) => a.nome === "relatorio_quality.md");
-  const arquivos = pr.arquivos?.length ? pr.arquivos.map((f) => `<h4>${esc(f.arquivo)}</h4><pre class="diff">${esc(f.patch).split("\n").map((l) =>
-      l.startsWith("+") ? `<span class="add">${l}</span>` : l.startsWith("-") ? `<span class="del">${l}</span>` : l).join("\n")}</pre>`).join("")
-    : d.artefatos.filter((a) => a.tipo === "sql").map((a) => `<h4>${esc(a.nome)}</h4><pre>${esc(a.conteudo)}</pre>`).join("");
+  const decisoes = (espec.decisoes_do_negocio || []).length ? espec.decisoes_do_negocio
+    : d.aprovacoes.filter((a) => a.tipo === "esclarecimento" && a.resposta).flatMap((a) => Object.values(a.resposta).map((v) => ({ pergunta: "", resposta: v })));
+  const q = d.artefatos.find((a) => a.nome === "relatorio_quality.md")?.conteudo || "";
+  const resultado = q.includes("## Resposta") ? q.slice(q.indexOf("## Resposta")).replace(/^##[^\n]*\n/, "") : "";
+  const ultimaIt = Math.max(0, ...d.dq.map((t) => t.iteracao));
+  const aprovadoQ = d.dq.length && d.dq.filter((t) => t.iteracao === ultimaIt).every((t) => t.status === "passou");
+  const objetos = Object.keys(r.estado?.objetos || {});
+  const arquivosPR = pr.arquivos || [];
+  const sqls = d.artefatos.filter((a) => a.tipo === "sql");
+  const codigo = arquivosPR.length
+    ? arquivosPR.map((f) => `<h4>${esc(f.arquivo)} <span class="pill">${esc(f.status)}</span></h4><pre class="diff">${esc(f.patch).split("\n").map((l) =>
+        l.startsWith("+") ? `<span class="add">${l}</span>` : l.startsWith("-") ? `<span class="del">${l}</span>` : l).join("\n")}</pre>`).join("")
+    : sqls.map((a) => `<h4>${esc(a.nome)}</h4><pre><code class="language-sql">${esc(a.conteudo)}</code></pre>`).join("");
+  const testes = [...new Set(d.dq.map((t) => t.iteracao))].map((it) => `<h4>Iteração ${it}</h4><table class="tabela">${d.dq.filter((t) => t.iteracao === it).map((t) =>
+      `<tr><td style="width:34%">${esc(t.teste)}</td><td style="width:90px"><span class="pill st-${t.status}">${t.status === "passou" ? "✓ passou" : "✕ falhou"}</span></td><td>${esc(t.evidencia || "")}</td></tr>`).join("")}</table>`).join("");
+  const lista = (xs) => `<ul>${(xs || []).map((x) => `<li>${esc(typeof x === "string" ? x : `${x.nome}: ${x.definicao}`)}</li>`).join("")}</ul>`;
   const pode = r.status === "aguardando_revisao";
   $("#rev-detalhe").innerHTML = `
-    ${!CFG.github ? '<div class="aviso">GitHub não configurado: o PR é simulado e os artefatos ficam no volume do time. Configure o secret <code>github_token</code> do app.</div>' : ""}
-    ${CFG.modo_aprovacao === "app_token" && CFG.github ? '<div class="aviso">Modo de aprovação <b>app_token</b>: o merge é feito pelo token do app e a decisão fica registrada com a sua identidade. Com o GitHub App + OAuth, a aprovação sai com o seu usuário do GitHub.</div>' : ""}
-    <div class="cartao"><h3>Pedido</h3><div><b>${esc(r.pergunta)}</b></div><div class="estado">por ${esc(r.solicitante)} · run ${esc(r.run_id)} ·
-      ${r.pr_url ? `<a href="${esc(r.pr_url)}" target="_blank">abrir no GitHub</a>` : "PR simulado"} · ${pr.pr ? `autor ${esc(pr.pr.autor)}` : ""}</div></div>
-    <div class="cartao"><h3>Especificação (Analyst) e decisões do negócio</h3><pre>${esc(JSON.stringify({ objetivo: espec.objetivo, grao: espec.grao, regras: espec.regras, medidas: espec.medidas }, null, 1))}</pre>
-      ${decisoes.length ? `<div>Decisões: ${esc(JSON.stringify(decisoes))}</div>` : ""}</div>
-    <div class="cartao"><h3>Quality Agent</h3><div class="md">${q ? md(q.conteudo) : "<i>sem relatório</i>"}</div></div>
-    <div class="cartao"><h3>Mudanças (${pr.arquivos?.length ? "diff do PR" : "artefatos"})</h3>${arquivos || "<i>sem arquivos</i>"}</div>
-    <div class="cartao"><h3>Decisão</h3>${pode ? `<div class="acoes"><textarea id="rev-coment" placeholder="Comentário (obrigatório para solicitar mudanças)"></textarea>
-      <button class="primario" data-d="aprovar">✅ Aprovar e fazer merge</button><button class="sec" data-d="mudancas">🔁 Solicitar mudanças</button>
-      <button class="perigo" data-d="rejeitar">⛔ Rejeitar</button></div>` : `<div>Status: <b>${esc(r.status)}</b></div>`}</div>`;
+    ${!CFG.github ? '<div class="aviso">GitHub não configurado: o PR é simulado e os artefatos ficam no volume do time.</div>' : ""}
+    <div class="cartao rev-cab">
+      <div class="rev-titulo">${esc(espec.titulo || r.produto || "Produto de dados")}</div>
+      <div class="rev-pergunta">“${esc(r.pergunta)}”</div>
+      <div class="rev-meta">
+        <span class="pill ${aprovadoQ ? "st-passou" : "st-falhou"}">${aprovadoQ ? "✓ Quality aprovou" : "✕ Quality reprovou"}</span>
+        <span class="pill">${r.iteracoes || 0} iteraç${(r.iteracoes || 0) > 1 ? "ões" : "ão"} Engineer ⇄ Quality</span>
+        <span class="pill">${objetos.length} objeto${objetos.length === 1 ? "" : "s"}</span>
+        ${r.pr_url ? `<a class="pill link" href="${esc(r.pr_url)}" target="_blank">PR #${r.pr_numero} no GitHub ↗</a>` : '<span class="pill">PR simulado</span>'}
+        <span class="rev-autor">pedido por ${esc(r.solicitante)}${pr.pr ? ` · PR de ${esc(pr.pr.autor)}` : ""}</span>
+      </div>
+    </div>
+    <div class="abas-int">${[["resumo", "Resumo"], ["testes", `Testes (${d.dq.length})`], ["codigo", `Código (${arquivosPR.length || sqls.length})`], ["espec", "Especificação"]]
+      .map(([k, n], i) => `<button data-p="${k}" class="${i ? "" : "ativa"}">${n}</button>`).join("")}</div>
+    <div class="painel ativa" data-p="resumo">
+      <div class="cartao"><h3>Decisões do negócio</h3>${decisoes.length ? `<ul>${decisoes.map((x) => `<li>${x.pergunta ? `${esc(x.pergunta)} → ` : ""}<b>${esc(x.resposta)}</b></li>`).join("")}</ul>` : "<i>nenhuma</i>"}</div>
+      <div class="cartao"><h3>Resultado no sandbox (pergunta original)</h3><div class="md">${resultado ? md(resultado) : "<i>—</i>"}</div></div>
+      <div class="cartao"><h3>Objetos criados</h3>${objetos.length ? `<ul>${objetos.map((o) => `<li><code>${esc(o)}</code></li>`).join("")}</ul>` : "<i>—</i>"}</div>
+    </div>
+    <div class="painel" data-p="testes"><div class="cartao">${testes || "<i>sem testes</i>"}</div></div>
+    <div class="painel" data-p="codigo"><div class="cartao">${codigo || "<i>sem arquivos</i>"}</div></div>
+    <div class="painel" data-p="espec"><div class="cartao">
+      <h3>Objetivo</h3><p>${esc(espec.objetivo || "")}</p><h3>Grão</h3><p>${esc(espec.grao || "")}</p>
+      <h3>Regras</h3>${lista(espec.regras)}<h3>Medidas</h3>${lista(espec.medidas)}<h3>Dimensões</h3>${lista(espec.dimensoes)}</div></div>
+    ${pode ? `<div class="decisao-fixa"><textarea id="rev-coment" placeholder="Comentário para o PR (obrigatório para solicitar mudanças)"></textarea>
+      <div class="acoes"><button class="primario" data-d="aprovar">✓ Aprovar e fazer merge</button><button class="sec" data-d="mudancas">↻ Solicitar mudanças</button>
+      <button class="perigo" data-d="rejeitar">✕ Rejeitar</button></div></div>` : `<div class="cartao"><h3>Decisão</h3><span class="pill st-${esc(r.status)}">${esc(r.status)}</span></div>`}`;
+  $("#rev-detalhe").querySelectorAll(".abas-int button").forEach((b) => b.onclick = () => {
+    $("#rev-detalhe").querySelectorAll(".abas-int button").forEach((x) => x.classList.toggle("ativa", x === b));
+    $("#rev-detalhe").querySelectorAll(".painel").forEach((p) => p.classList.toggle("ativa", p.dataset.p === b.dataset.p));
+  });
+  if (window.hljs) $("#rev-detalhe").querySelectorAll("code.language-sql").forEach((c) => hljs.highlightElement(c));
   $("#rev-detalhe").querySelectorAll("button[data-d]").forEach((b) => b.onclick = async () => {
     const decisao = b.dataset.d, comentario = $("#rev-coment").value;
     if (decisao === "mudancas" && !comentario.trim()) { alert("Descreva as mudanças."); return; }
-    $("#rev-detalhe").querySelectorAll("button").forEach((x) => x.disabled = true);
+    $("#rev-detalhe").querySelectorAll("button[data-d]").forEach((x) => x.disabled = true);
     try { await api(`/api/runs/${revSel}/revisao`, { method: "POST", body: JSON.stringify({ decisao, comentario }) }); runAtual = revSel; abrirAba("time"); acompanhar(revSel); }
-    catch (e) { alert(e.message); $("#rev-detalhe").querySelectorAll("button").forEach((x) => x.disabled = false); }
+    catch (e) { alert(e.message); $("#rev-detalhe").querySelectorAll("button[data-d]").forEach((x) => x.disabled = false); }
   });
 }
 
@@ -296,7 +378,7 @@ async function carregarOperacao() {
   const s = o.resumo || {};
   $("#op-kpis").innerHTML = [["execuções", s.execucoes], ["concluídas", s.concluidas], ["PRs", s.prs], ["iterações médias", fmtCelula(s.iteracoes_media)],
     ["minutos por execução", fmtCelula(s.minutos_medio)], ["tokens", ((+s.tokens_entrada || 0) + (+s.tokens_saida || 0)).toLocaleString("pt-BR")]]
-    .map(([k, v]) => `<div class="kpi">${k}<b>${esc(v ?? 0)}</b></div>`).join("");
+    .map(([k, v]) => `<div class="kpi">${k.charAt(0).toUpperCase() + k.slice(1)}<b>${esc(v ?? 0)}</b></div>`).join("");
   const ROTULO = { agente: "Agente", chamadas_llm: "Chamadas ao LLM", tools: "Ferramentas", tokens_entrada: "Tokens de entrada",
     tokens_saida: "Tokens de saída", seg_medio: "Tempo médio (s)", tipo: "Tipo", decisao: "Decisão", n: "Quantidade",
     status: "Status", criado_em: "Início", pergunta: "Pergunta", iteracoes: "Iterações", produto: "Produto de dados" };
@@ -304,10 +386,18 @@ async function carregarOperacao() {
     : c === "agente" && v ? v.charAt(0).toUpperCase() + v.slice(1) : fmtCelula(v);
   const tab = (el, linhas, cols) => { $(el).innerHTML = `<tr>${cols.map((c) => `<th>${ROTULO[c] || c}</th>`).join("")}</tr>` +
     (linhas || []).map((l) => `<tr>${cols.map((c) => `<td>${esc(fmt(c, l[c] ?? ""))}</td>`).join("")}</tr>`).join(""); };
-  tab("#op-agentes", (o.por_agente || []).filter((a) => !["genie", "humano"].includes(a.agente)),
-      ["agente", "chamadas_llm", "tools", "tokens_entrada", "tokens_saida", "seg_medio"]);
+  const ags = (o.por_agente || []).filter((a) => !["genie", "humano"].includes(a.agente))
+    .map((a) => ({ ...a, total: (+a.tokens_entrada || 0) + (+a.tokens_saida || 0) })).sort((x, y) => y.total - x.total);
+  const maxT = Math.max(1, ...ags.map((a) => a.total));
+  $("#op-barras").innerHTML = ags.map((a) => `<div class="hbar" title="${esc(NOME_AGENTE[a.agente] || a.agente)}: ${a.total.toLocaleString("pt-BR")} tokens · ${a.chamadas_llm} chamadas ao LLM · ${a.tools} ferramentas">
+      <div class="hbar-rot">${chip(a.agente)}</div><div class="hbar-trilho"><span style="width:${(a.total / maxT * 100).toFixed(1)}%"></span></div>
+      <div class="hbar-val">${(a.total / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}k</div></div>`).join("");
+  tab("#op-agentes", ags, ["agente", "chamadas_llm", "tools", "tokens_entrada", "tokens_saida", "seg_medio"]);
   tab("#op-aprov", o.aprovacoes, ["tipo", "decisao", "n"]);
-  tab("#op-dq", o.dq, ["status", "n"]);
+  const dq = Object.fromEntries((o.dq || []).map((x) => [x.status, +x.n]));
+  $("#op-dq").innerHTML = `<div class="tiles"><div class="tile"><span class="pill st-passou">✓ passou</span><b>${dq.passou || 0}</b></div>
+    <div class="tile"><span class="pill st-falhou">✕ falhou</span><b>${dq.falhou || 0}</b></div>
+    <div class="tile"><span class="pill">testes aprovados</span><b>${(dq.passou || 0) + (dq.falhou || 0) ? Math.round((dq.passou || 0) / ((dq.passou || 0) + (dq.falhou || 0)) * 100) : 0}%</b></div></div>`;
   tab("#op-runs", runs, ["criado_em", "pergunta", "status", "iteracoes", "produto", "tokens_saida"]);
   $("#op-links").innerHTML = [CFG.experimento_url && `<a target="_blank" href="${CFG.experimento_url}">Traces no MLflow →</a>`,
     CFG.genie_url && `<a target="_blank" href="${CFG.genie_url}">Genie →</a>`].filter(Boolean).join("");
