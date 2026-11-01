@@ -164,12 +164,20 @@ def _vigiar_prs():
 
 
 @app.post("/api/admin/reset")
-def reset(req: Request):
-    """Usado pelo scripts/reset_demo.py: limpa execuções, aprovações e checkpoints (estado limpo da demo)."""
+def reset(req: Request, apagar_historico: bool = False):
+    """Usado pelo scripts/reset_demo.py. Padrão: arquiva (mantém histórico, descarta só o pendente)."""
     _revisor(req)
-    tabelas = db.limpar_tudo()
-    grafo.iniciar()  # recria as tabelas de checkpoint do LangGraph
-    return {"tabelas_limpas": tabelas}
+    r = db.reset_demo(apagar_historico)
+    if apagar_historico:
+        grafo.iniciar()  # recria as tabelas de checkpoint do LangGraph
+    return r
+
+
+@app.post("/api/admin/importar")
+async def importar(req: Request):
+    """Importa execuções recuperadas (scripts/restaurar_historico.py)."""
+    _revisor(req)
+    return db.importar_historico(await req.json())
 
 
 # ---------------------------------------------------------------- operação e config

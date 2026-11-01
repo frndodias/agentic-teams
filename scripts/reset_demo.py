@@ -4,7 +4,8 @@ uv run --with databricks-sdk --with requests python scripts/reset_demo.py --geni
 
 1. Apaga os objetos do sandbox (agentic_teams_sandbox).
 2. Apaga de ecommerce os objetos promovidos pelo time (tag produzido_por = agentic_teams).
-3. Limpa o estado operacional no Lakebase (execuções, etapas, aprovações, checkpoints).
+3. Lakebase: ARQUIVA por padrão — o histórico fica; execuções pendentes viram "descartado".
+   --apagar-historico zera tudo (execuções, etapas, aprovações e checkpoints).
 4. GitHub: fecha PRs abertos de branches agent/*, apaga as branches e remove produtos_dados/* da main.
 5. Restaura o Genie space a partir de genie/estado_limpo.json.
 6. Limpa o volume de artefatos.
@@ -24,6 +25,7 @@ p.add_argument("--warehouse", default="ed167610612860b6")
 p.add_argument("--genie", required=True)
 p.add_argument("--repo", default="frndodias/agentic-teams-pr")
 p.add_argument("--app", default="agentic-teams")
+p.add_argument("--apagar-historico", action="store_true", help="zera o histórico do time no Lakebase (padrão: arquivar)")
 a = p.parse_args()
 w = WorkspaceClient(profile=a.profile)
 
@@ -47,10 +49,11 @@ for (nome,) in sql(f"SELECT DISTINCT table_name FROM {a.catalog}.information_sch
     sql(f"DROP {'VIEW' if tipo and 'VIEW' in tipo[0][0] else 'TABLE'} IF EXISTS {a.catalog}.ecommerce.{nome}")
     print("   -", nome)
 
-print("3) Lakebase (via app, que é dono das tabelas)")
+print("3) Lakebase (via app, que é dono das tabelas): " + ("apagando histórico" if a.apagar_historico else "arquivando"))
 app_url = w.apps.get(a.app).url
 tok = w.config.authenticate()["Authorization"]
-r = requests.post(f"{app_url}/api/admin/reset", headers={"Authorization": tok}, timeout=120)
+r = requests.post(f"{app_url}/api/admin/reset", headers={"Authorization": tok}, timeout=120,
+                  params={"apagar_historico": "true" if a.apagar_historico else "false"})
 r.raise_for_status()
 print("   -", r.json())
 

@@ -102,6 +102,7 @@ async function acompanhar(runId) {
         return;
       }
       if (st === "rejeitado") { msg("Supervisor", "PR rejeitado: os objetos do sandbox foram descartados.", "bot time"); return; }
+      if (st === "descartado") return;  // execução arquivada por um reset da demo
     } catch (e) { /* tenta de novo */ }
     setTimeout(loop, 2500);
   };
@@ -215,7 +216,7 @@ async function atualizarBadge() {
   $("#badge-revisao").classList.toggle("oculto", !n);
 }
 async function carregarRevisao() {
-  const runs = (await api("/api/runs")).filter((r) => r.pr_url || ["aguardando_revisao", "concluido", "rejeitado"].includes(r.status));
+  const runs = (await api("/api/runs")).filter((r) => r.pr_url || ["aguardando_revisao", "concluido", "rejeitado", "descartado"].includes(r.status));
   $("#lista-revisao").innerHTML = runs.map((r) => `<li data-id="${r.run_id}" class="${r.run_id === revSel ? "sel" : ""}">
     <div>${esc(r.produto || r.pergunta.slice(0, 50))}</div><div class="estado">${esc(r.status)} ${r.pr_url ? "· PR" : ""}</div></li>`).join("") || '<li class="vazio">nenhum PR</li>';
   $("#lista-revisao").querySelectorAll("li[data-id]").forEach((li) => li.onclick = () => { revSel = li.dataset.id; carregarRevisao(); detalheRevisao(); });
@@ -274,6 +275,6 @@ async function carregarOperacao() {
   $("#usuario").textContent = `${CFG.usuario} · ${CFG.modelo}`;
   msg("Genie", "Olá! Pergunte sobre vendas, lojistas, pagamentos, disputas, atendimento ou marketing. Se eu não tiver o dado, o time de dados constrói. 🚀");
   const runs = await api("/api/runs");
-  runs.filter((r) => !["concluido", "falhou", "rejeitado"].includes(r.status)).forEach((r) => acompanhar(r.run_id));
+  runs.filter((r) => !["concluido", "falhou", "rejeitado", "descartado"].includes(r.status)).forEach((r) => acompanhar(r.run_id));
   atualizarBadge();
 })();

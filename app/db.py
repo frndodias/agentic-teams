@@ -5,6 +5,7 @@ import threading
 import time
 
 import psycopg
+import psycopg.types.json
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
@@ -235,12 +236,53 @@ def operacao():
     }
 
 
-def limpar_tudo():
-    """Reset da demo: esvazia o estado operacional e apaga as tabelas do LangGraph (recriadas em seguida pelo setup)."""
-    proprias = ["runs", "steps", "handoffs", "approvals", "dq_results", "artifacts"]
+def reset_demo(apagar_historico: bool = False):
+    """Reset da demo. Padrão: ARQUIVA — mantém o histórico, descarta só o que estava em andamento/pendente
+    (e os checkpoints dessas execuções, que não podem mais ser retomadas). apagar_historico=True zera tudo."""
     langgraph = ["checkpoint_writes", "checkpoint_blobs", "checkpoints", "checkpoint_migrations"]
     with pool.connection() as c:
-        c.execute("TRUNCATE " + ", ".join(f"{C.PG_SCHEMA}.{t}" for t in proprias) + " RESTART IDENTITY")
-        for t in langgraph:
-            c.execute(f"DROP TABLE IF EXISTS {C.PG_SCHEMA}.{t}")
-    return proprias + langgraph
+        if apagar_historico:
+            proprias = ["runs", "steps", "handoffs", "approvals", "dq_results", "artifacts"]
+            c.execute("TRUNCATE " + ", ".join(f"{C.PG_SCHEMA}.{t}" for t in proprias) + " RESTART IDENTITY")
+            for t in langgraph:
+                c.execute(f"DROP TABLE IF EXISTS {C.PG_SCHEMA}.{t}")
+            return {"modo": "apagar_historico"}
+        ids = [r["run_id"] for r in c.execute(
+            "SELECT run_id FROM runs WHERE status NOT IN ('concluido', 'rejeitado', 'descartado')").fetchall()]
+        if ids:
+            c.execute("UPDATE runs SET status='descartado', etapa='descartado', finalizado_em=COALESCE(finalizado_em, now()), "
+                      "atualizado_em=now() WHERE run_id = ANY(%s)", (ids,))
+            c.execute("UPDATE approvals SET status='descartada' WHERE status='pendente' AND run_id = ANY(%s)", (ids,))
+            c.execute("UPDATE artifacts SET status='descartado' WHERE run_id = ANY(%s)", (ids,))
+            for t in ["checkpoint_writes", "checkpoint_blobs", "checkpoints"]:
+                c.execute(f"DELETE FROM {t} WHERE thread_id = ANY(%s)", (ids,))
+        return {"modo": "arquivar", "descartados": ids}
+
+
+TABELAS_HISTORICO = {  # tabela -> colunas (sem a chave serial, que o banco gera)
+    "runs": None,
+    "steps": ["run_id", "agente", "acao", "titulo", "detalhe", "status", "iniciado_em", "finalizado_em", "tokens_entrada",
+              "tokens_saida", "modelo"],
+    "handoffs": ["run_id", "de_agente", "para_agente", "motivo", "ts"],
+    "approvals": ["run_id", "tipo", "pergunta", "resposta", "decisao", "comentario", "usuario", "login_github", "status",
+                  "criado_em", "respondido_em"],
+    "dq_results": ["run_id", "iteracao", "teste", "status", "evidencia", "ts"],
+    "artifacts": ["run_id", "tipo", "nome", "conteudo", "status", "ts"],
+}
+_JSONB = {"detalhe", "pergunta", "resposta", "estado"}
+
+
+def importar_historico(dados: dict) -> dict:
+    """Importa execuções recuperadas (ex.: de um branch point-in-time do Lakebase). Ignora run_id que já existe."""
+    novos = [r for r in dados.get("runs", []) if not get_run(r["run_id"])]
+    ids = {r["run_id"] for r in novos}
+    cont = {}
+    with pool.connection() as c:
+        for tabela, cols in TABELAS_HISTORICO.items():
+            linhas = novos if tabela == "runs" else [x for x in dados.get(tabela, []) if x.get("run_id") in ids]
+            for x in linhas:
+                cs = cols or [k for k in x.keys()]
+                vals = [psycopg.types.json.Jsonb(x.get(k)) if k in _JSONB and x.get(k) is not None else x.get(k) for k in cs]
+                c.execute(f"INSERT INTO {tabela} ({', '.join(cs)}) VALUES ({', '.join(['%s'] * len(cs))})", vals)
+            cont[tabela] = len(linhas)
+    return cont
