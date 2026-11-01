@@ -25,7 +25,8 @@ Genie ──(lacuna)──▶ Supervisor ─▶ Discovery ─▶ Analyst ─▶ 
 | App | `app/` · app `agentic-teams` | FastAPI + LangGraph. Áreas: Conversa, Time ao vivo, Revisão, Operação |
 | Promoção | `src/promover/` · job `agentic_teams_promover_produto` | Pós-merge: sandbox → `ecommerce`, grants para os leitores, publica a metric view no Genie |
 | Genie | `genie/estado_limpo.json` | Space "Nuvemshop Commerce (demo)" — a instrução da lacuna fica entre `[LACUNA]...[/LACUNA]` |
-| Reset | `scripts/reset_demo.py` | Volta tudo ao estado limpo (sandbox, ecommerce, Lakebase, GitHub, Genie, artefatos) |
+| Reset | `scripts/reset_demo.py` | Volta a demo ao estado limpo (sandbox, ecommerce, GitHub, Genie, artefatos). **Arquiva** o histórico no Lakebase (pendentes viram "descartado"); `--apagar-historico` zera tudo |
+| Restauração | `scripts/restaurar_historico.py` | Recupera execuções de um branch point-in-time do Lakebase |
 
 Schemas: `ecommerce` (dados), `agentic_teams` (como o time trabalha), `agentic_teams_sandbox` (o que o time produz).
 
